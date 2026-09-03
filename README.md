@@ -85,3 +85,8 @@ CLI/
 ├── README.md      Project documentation
 └── .gitignore     Git exclusions
 ```
+## Author
+
+Stamatoiu Robert Nicolas
+
+## Co-authors
