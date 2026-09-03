@@ -7,13 +7,18 @@ Small Windows command-line utilities written in C++20.
 | Command | Source | Purpose |
 | --- | --- | --- |
 | `touch` | `src/touch-script.cpp` | Creates files, appends contents, or replaces contents with `--overwrite`. |
-| `mkproj` | `src/mkproj-script.cpp` | Creates a project skeleton for C++, Python, Rust, or web projects. |
+| `mkproj` | `src/mkproj-script.cpp` | Creates a project skeleton for C++, Python, Rust, web, or Node.js projects. |
 | `pysetup` | `src/pysetup-script.cpp` | Creates or reuses a Python virtual environment and installs selected package presets. |
 | `del` | `src/del-script.cpp` | Deletes files and empty directories, or recursively deletes directories with `--recursive`. |
 
 Each utility supports `--help` and `--version` where applicable. Programs return
 the status constants defined in `include/sys.hpp`; child-process results are
 represented as `100 + child_exit_code`.
+
+For Node.js projects, `mkproj <name> --node` creates `package.json`,
+`package-load.json`, and `index.js`. The generated package is private by
+default, uses CommonJS, requires Node.js 18 or newer, and is immediately
+usable with `npm start` or `node index.js`.
 
 ## Headers
 
