@@ -7,7 +7,7 @@
 
 namespace
 {
-    constexpr std::string_view VERSION = "1.3";
+    constexpr std::string_view VERSION = "1.3.2";
 
     bool contains(const std::vector<std::string>& values, std::string_view value)
     {
@@ -126,26 +126,13 @@ int main(int argc, const char* argv[])
             term::println("npm install cowsay failed.", term::style::error);
             return npm_install.returnCode;
         }
-
-        const std::string package_load_json =
-            "{\n"
-            "  \"description\": \"Package loading manifest for this Node.js project\",\n"
-            "  \"packageManager\": \"npm\",\n"
-            "  \"install\": \"npm install cowsay\",\n"
-            "  \"start\": \"npm start\",\n"
-            "  \"dependencies\": {\n"
-            "    \"cowsay\": \"^1.6.0\"\n"
-            "  }\n"
-            "}\n";
         const std::string index_js =
-            "'use strict';\n\n"
             "const cowsay = require('cowsay');\n\n"
             "function main() {\n"
             "  console.log(cowsay.say({ text: 'Hello from mkproj!' }));\n"
             "}\n\n"
             "main();\n";
-        if (sys::touch(project / "package-load.json", package_load_json, true) != sys::SUCCESS ||
-            sys::touch(project / "index.js", index_js, true) != sys::SUCCESS)
+        if (sys::touch(project / "src" / "index.js", index_js, true) != sys::SUCCESS)
             return sys::WRITE_ERROR;
     }
     term::println("Successfully created project \"" + project.string() + "\"!",
