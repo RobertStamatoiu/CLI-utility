@@ -15,10 +15,11 @@ Each utility supports `--help` and `--version` where applicable. Programs return
 the status constants defined in `include/sys.hpp`; child-process results are
 represented as `100 + child_exit_code`.
 
-For Node.js projects, `mkproj <name> --node` creates `package.json`,
-`package-load.json`, and `index.js`. The generated package is private by
-default, uses CommonJS, requires Node.js 18 or newer, and is immediately
-usable with `npm start` or `node index.js`.
+For Node.js projects, `mkproj <name> --node` runs `cmd.exe` through
+`sys::exec()` to execute `npm init -y` and `npm install cowsay` in the new
+project directory. It then creates `package-load.json` and `index.js`.
+The generated project uses CommonJS and is immediately usable with
+`npm start` or `node index.js`.
 
 ## Headers
 

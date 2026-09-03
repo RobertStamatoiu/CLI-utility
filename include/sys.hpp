@@ -127,6 +127,7 @@ namespace sys
         bool captureStdErr = false;
         bool hideOutput = true;
         bool searchPATH = false;
+        fs::path currentDirectory = fs::current_path();
     };
 
     struct execReturnType
@@ -333,7 +334,7 @@ namespace sys
         if (!CreateProcessW(
                 applicationName.empty() ? nullptr : applicationName.c_str(),
                 commandBuffer.data(), nullptr, nullptr, inheritHandles, 0,
-                nullptr, fs::current_path().c_str(), &startup, &process))
+                nullptr, options.currentDirectory.c_str(), &startup, &process))
         {
             const int result = detail::mapWindowsError(GetLastError());
             if (writeHandle) CloseHandle(writeHandle);
