@@ -7,7 +7,7 @@
 
 namespace
 {
-    constexpr std::string_view VERSION = "1.3.2";
+    constexpr std::string_view VERSION = "1.3.3";
 
     bool contains(const std::vector<std::string>& values, std::string_view value)
     {
@@ -20,7 +20,8 @@ int main(int argc, const char* argv[])
     const std::vector<std::string> args(argv + 1, argv + argc);
     if (args.empty())
     {
-        term::println("Usage: mkproj <name> [--cpp] [--python] [--rust] [--web] [--node]",
+        term::println(
+            "Usage: mkproj <name> [--cpp] [--python] [--java] [--rust] [--web] [--node]",
                       term::style::error);
         return sys::INVALID_INPUT_ERROR;
     }
@@ -35,7 +36,7 @@ int main(int argc, const char* argv[])
         if (args.size() != 1) return sys::INVALID_INPUT_ERROR;
         term::println(
             "Usage: mkproj <name> [language flags]\n"
-            "Flags: --cpp, --python, --rust, --web, --node",
+            "Flags: --cpp, --python, --java, --rust, --web, --node",
             term::style::info);
         return sys::SUCCESS;
     }
@@ -82,6 +83,17 @@ int main(int argc, const char* argv[])
             "def main():\n    print(\"Hello, World!\")\n\n"
             "if __name__ == \"__main__\":\n    main()\n";
         if (sys::touch(project / "src" / "main.py", main, true) != sys::SUCCESS)
+            return sys::WRITE_ERROR;
+    }
+    if (contains(args, "--java"))
+    {
+        const std::string main =
+            "public class Main {\n"
+            "    public static void main(String[] args) {\n"
+            "        System.out.println(\"Hello, World!\");\n"
+            "    }\n"
+            "}\n";
+        if (sys::touch(project / "src" / "Main.java", main, true) != sys::SUCCESS)
             return sys::WRITE_ERROR;
     }
     if (contains(args, "--rust"))
