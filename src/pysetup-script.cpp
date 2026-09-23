@@ -85,7 +85,7 @@ std::vector<const char *> web_preset = {
     "websockets",
     "python-dotenv"};
 
-std::string version = "0.2.1";
+std::string version = "0.2.2";
 namespace help
 {
     std::string version = R"(Usage:
@@ -383,7 +383,7 @@ Details:
     std::string json_object;
     if (res.returnCode == sys::SUCCESS || res.returnCode - 100 == sys::SUCCESS)
     {
-        json_object = res.output.value();
+        json_object = res.StandardOut.value();
     }
     else
     {
