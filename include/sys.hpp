@@ -8,6 +8,13 @@
  * failures use the documented status codes below; child-process exit codes
  * are returned as 100 + child_exit_code by exec().
  */
+#ifndef NO_MIN_MAX
+    #define NO_MIN_MAX
+#endif
+#ifndef WIN32_LEAN_AND_MEAN
+    #define WIN32_LEAN_AND_MEAN
+#endif
+
 
 #include <windows.h>
 
@@ -25,47 +32,6 @@ namespace fs = std::filesystem;
 
 namespace sys
 {
-    /** ANSI/VT100 escape sequences used by CLI output and terminal control. */
-    namespace ansi
-    {
-        inline constexpr std::string_view ESC = "\x1b";
-        inline constexpr std::string_view RESET = "\x1b[0m";
-        inline constexpr std::string_view BOLD = "\x1b[1m";
-        inline constexpr std::string_view DIM = "\x1b[2m";
-        inline constexpr std::string_view ITALIC = "\x1b[3m";
-        inline constexpr std::string_view UNDERLINE = "\x1b[4m";
-        inline constexpr std::string_view SGR_BLINK = "\x1b[5m";
-        inline constexpr std::string_view SGR_RAPID_BLINK = "\x1b[6m";
-        inline constexpr std::string_view INVERSE = "\x1b[7m";
-        inline constexpr std::string_view HIDDEN = "\x1b[8m";
-        inline constexpr std::string_view STRIKETHROUGH = "\x1b[9m";
-        inline constexpr std::string_view DOUBLE_UNDERLINE = "\x1b[21m";
-        inline constexpr std::string_view OVERLINE = "\x1b[53m";
-        inline constexpr std::string_view CLEAR_SCREEN = "\x1b[2J";
-        inline constexpr std::string_view CLEAR_LINE = "\x1b[2K";
-        inline constexpr std::string_view CURSOR_HOME = "\x1b[H";
-        inline constexpr std::string_view CURSOR_HIDE = "\x1b[?25l";
-        inline constexpr std::string_view CURSOR_SHOW = "\x1b[?25h";
-
-        inline std::string cursor_position(int row, int column)
-        {
-            return "\x1b[" + std::to_string(row) + ";" +
-                   std::to_string(column) + "H";
-        }
-
-        inline std::string foreground(int red, int green, int blue)
-        {
-            return "\x1b[38;2;" + std::to_string(red) + ";" +
-                   std::to_string(green) + ";" + std::to_string(blue) + "m";
-        }
-
-        inline std::string background(int red, int green, int blue)
-        {
-            return "\x1b[48;2;" + std::to_string(red) + ";" +
-                   std::to_string(green) + ";" + std::to_string(blue) + "m";
-        }
-    }
-
     inline constexpr int SUCCESS = 0;
 
     // Filesystem and I/O.
@@ -125,7 +91,8 @@ namespace sys
     {
         bool captureStdOut = false;
         bool captureStdErr = false;
-        bool hideOutput = true;
+        bool hideStdOut = true;
+        bool hideStdErr = false;
         bool searchPATH = false;
         fs::path currentDirectory = fs::current_path();
     };
@@ -133,7 +100,8 @@ namespace sys
     struct execReturnType
     {
         int returnCode;
-        std::optional<std::string> output;
+        std::optional<std::string> StandardOut;
+        std::optional<std::string> StandardError;
     };
 
     namespace detail
@@ -309,25 +277,56 @@ namespace sys
         PROCESS_INFORMATION process{};
         startup.cb = sizeof(startup);
 
-        HANDLE readHandle = nullptr;
-        HANDLE writeHandle = nullptr;
+        HANDLE readHandleStdOut = nullptr;
+        HANDLE writeHandleStdOut = nullptr;
+        HANDLE readHandleStdErr = nullptr;
+        HANDLE writeHandleStdErr = nullptr;
+        HANDLE hNullDevice = CreateFileW(
+            L"NUL",
+            GENERIC_WRITE,
+            FILE_SHARE_READ | FILE_SHARE_WRITE,
+            NULL, 
+            OPEN_EXISTING,
+            FILE_ATTRIBUTE_NORMAL,
+            NULL
+        );
         BOOL inheritHandles = FALSE;
-        if (options.captureStdOut || options.captureStdErr)
+        if (options.captureStdOut)
         {
             SECURITY_ATTRIBUTES attributes{};
             attributes.nLength = sizeof(attributes);
             attributes.bInheritHandle = TRUE;
-            if (!CreatePipe(&readHandle, &writeHandle, &attributes, 0))
-                return {CREATE_PIPE_ERROR, std::nullopt};
-            if (!SetHandleInformation(readHandle, HANDLE_FLAG_INHERIT, 0))
+            if (!CreatePipe(&readHandleStdOut, &writeHandleStdOut, &attributes, 0))
+                return {CREATE_PIPE_ERROR, std::nullopt, std::nullopt};
+            if (!SetHandleInformation(readHandleStdOut, HANDLE_FLAG_INHERIT, 0))
             {
-                CloseHandle(readHandle);
-                CloseHandle(writeHandle);
-                return {SET_HANDLE_INFO_ERROR, std::nullopt};
+                CloseHandle(readHandleStdOut);
+                CloseHandle(writeHandleStdOut);
+                return {SET_HANDLE_INFO_ERROR, std::nullopt, std::nullopt};
             }
             startup.dwFlags |= STARTF_USESTDHANDLES;
-            startup.hStdOutput = writeHandle;
-            startup.hStdError = writeHandle;
+            startup.hStdOutput = writeHandleStdOut;
+        } else if (options.hideStdOut){
+            startup.hStdOutput = hNullDevice;
+        }
+        if(options.captureStdErr){
+            SECURITY_ATTRIBUTES attributes{};
+            attributes.nLength = sizeof(attributes);
+            attributes.bInheritHandle = TRUE;
+            if (!CreatePipe(&readHandleStdErr, &writeHandleStdErr, &attributes, 0))
+                return {CREATE_PIPE_ERROR, std::nullopt, std::nullopt};
+            if (!SetHandleInformation(readHandleStdErr, HANDLE_FLAG_INHERIT, 0))
+            {
+                CloseHandle(readHandleStdErr);
+                CloseHandle(writeHandleStdErr);
+                return {SET_HANDLE_INFO_ERROR, std::nullopt, std::nullopt};
+            }
+            startup.dwFlags |= STARTF_USESTDHANDLES;
+            startup.hStdError = writeHandleStdErr;
+        } else if (options.hideStdErr){
+            startup.hStdError = hNullDevice;
+        }
+        if(options.captureStdOut || options.captureStdErr || options.hideStdOut || options.hideStdErr){
             inheritHandles = TRUE;
         }
 
@@ -337,24 +336,40 @@ namespace sys
                 nullptr, options.currentDirectory.c_str(), &startup, &process))
         {
             const int result = detail::mapWindowsError(GetLastError());
-            if (writeHandle) CloseHandle(writeHandle);
-            if (readHandle) CloseHandle(readHandle);
-            return {result, std::nullopt};
+            if (writeHandleStdOut) CloseHandle(writeHandleStdOut);
+            if (writeHandleStdErr) CloseHandle(writeHandleStdErr);
+            if (readHandleStdOut) CloseHandle(readHandleStdOut);
+            if (readHandleStdErr) CloseHandle(readHandleStdErr);
+            return {result, std::nullopt, std::nullopt};
         }
-        if (writeHandle)
-            CloseHandle(writeHandle);
+        if (writeHandleStdOut)
+            CloseHandle(writeHandleStdOut);
+        if (writeHandleStdErr)
+            CloseHandle(writeHandleStdErr);
+        if (hNullDevice)
+            CloseHandle(hNullDevice);
 
-        std::string output;
-        if (readHandle)
+        std::string StdOut;
+        std::string StdErr;
+        if (readHandleStdOut)
         {
             char buffer[4096];
             DWORD bytesRead = 0;
-            while (ReadFile(readHandle, buffer, sizeof(buffer), &bytesRead, nullptr))
+            while (ReadFile(readHandleStdOut, buffer, sizeof(buffer), &bytesRead, nullptr))
             {
                 if (bytesRead == 0) break;
-                output.append(buffer, bytesRead);
+                StdOut.append(buffer, bytesRead);
             }
-            CloseHandle(readHandle);
+            CloseHandle(readHandleStdOut);
+        }
+        if (readHandleStdErr){
+            char buffer[4096];
+            DWORD bytesRead = 0;
+            while (ReadFile(readHandleStdErr, buffer, sizeof(buffer), &bytesRead, nullptr)){
+                if (bytesRead == 0) break;
+                StdErr.append(buffer, bytesRead);
+            }
+            CloseHandle(readHandleStdErr);
         }
 
         if (WaitForSingleObject(process.hProcess, INFINITE) == WAIT_FAILED)
@@ -362,7 +377,7 @@ namespace sys
             const int result = detail::mapWindowsError(GetLastError());
             CloseHandle(process.hThread);
             CloseHandle(process.hProcess);
-            return {result, std::nullopt};
+            return {result, std::nullopt, std::nullopt};
         }
 
         DWORD exitCode = 0;
@@ -371,14 +386,15 @@ namespace sys
             const int result = detail::mapWindowsError(GetLastError());
             CloseHandle(process.hThread);
             CloseHandle(process.hProcess);
-            return {result, std::nullopt};
+            return {result, std::nullopt, std::nullopt};
         }
         CloseHandle(process.hThread);
         CloseHandle(process.hProcess);
         return {
             static_cast<int>(exitCode) + 100,
-            readHandle ? std::optional<std::string>(std::move(output))
-                       : std::nullopt};
+            readHandleStdOut ? std::optional<std::string>(std::move(StdOut)) : std::nullopt,
+            readHandleStdErr ? std::optional<std::string>(std::move(StdErr)) : std::nullopt
+        };
     }
 
     /** Create a file, or append/replace its contents when it already exists. */
