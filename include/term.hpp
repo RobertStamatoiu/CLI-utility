@@ -6,20 +6,27 @@
  *
  * The public output API is term::print() and term::println(). Preset styles
  * are mutable and are replaced by style::load() when a theme is selected.
+ * Licenses to nlohmann/json.hpp, included in this header
  */
 
 #include <algorithm>
 #include <cctype>
 #include <cmath>
 #include <cstdint>
+#include <fstream>
 #include <iostream>
 #include <sstream>
 #include <stdexcept>
 #include <string>
 #include <string_view>
 #include <type_traits>
+#include <unordered_map>
 #include <variant>
 #include <vector>
+
+#include "./json.hpp"
+
+using json = nlohmann::json;
 
 namespace term
 {
@@ -80,9 +87,9 @@ namespace term
             {
             }
 
-            constexpr int red() const { return red_; }
-            constexpr int green() const { return green_; }
-            constexpr int blue() const { return blue_; }
+            constexpr int red() const noexcept { return red_; }
+            constexpr int green() const noexcept { return green_; }
+            constexpr int blue() const noexcept { return blue_; }
 
             std::string serialize(bool foreground = true) const
             {
@@ -261,6 +268,31 @@ namespace term
                     textStyle);
                 return result;
             }
+        
+            static Style BuildFromJson(json data){
+                if(!(data.contains("foreground") && data["foreground"].is_string())){
+                    throw new std::invalid_argument("Passed json object does not contain the required field \"foreground\" or may contain an invalid format");
+                } else if (!(data.contains("background") && data["background"].is_string())){
+                    throw new std::invalid_argument("Passed json object does not contain the required field \"background\" or may contain an invalid format");
+                } else if (!(data.contains("style") && data["style"].is_string())){
+                    throw new std::invalid_argument("Passed json object does not contain the required field \"style\" or may contain an invalid format");
+                }
+                color::RGBObject fg, bg;
+                // try to parse the forground and background
+                // we currently dont support named colors like "red"
+                try{
+                    fg = color::hex(data["foreground"]);
+                } catch (std::invalid_argument &e) {
+                    throw new std::invalid_argument("Fields \"foreground\" and \"background\" must contain valid hex values");
+                }
+                try{
+                    bg = color::hex(data["background"]);
+                } catch (std::invalid_argument &e) {
+                    throw new std::invalid_argument("Fields \"foreground\" and \"background\" must contain valid hex values");
+                }
+                return Style{.foreground = fg, .background = bg, .textStyle = data["style"].get<std::string>()};
+
+            }
         };
 
         /** A named collection of semantic CLI styles. */
@@ -271,6 +303,29 @@ namespace term
             Style warning;
             Style info;
             Style muted;
+
+            static Theme BuildFromJson(json data){
+                if(!data.is_object()){
+                    throw new std::invalid_argument("Passed json object must be an object type");
+                } else if(!(data.contains("success") && data["success"].is_object())){
+                    throw new std::invalid_argument("Passed json object does not contain the required field \"success\"");
+                } else if (!(data.contains("error") && data["error"].is_object())){
+                    throw new std::invalid_argument("Passed json object does not contain the required field \"error\"");
+                } else if (!(data.contains("warning") && data["warning"].is_object())){
+                    throw new std::invalid_argument("Passed json object does not contain the required field \"warning\"");
+                } else if (!(data.contains("info") && data["info"].is_object())){
+                    throw new std::invalid_argument("Passed json object does not contain the required field \"info\"");
+                } else if (!(data.contains("muted") && data["muted"].is_object())){
+                    throw new std::invalid_argument("Passed json object does not contain the required field \"muted\"");
+                }
+                return Theme{
+                    .success = Style::BuildFromJson(data["success"]),
+                    .error = Style::BuildFromJson(data["error"]),
+                    .warning = Style::BuildFromJson(data["warning"]),
+                    .info = Style::BuildFromJson(data["info"]),
+                    .muted = Style::BuildFromJson(data["muted"])
+                };
+            }
         };
 
         inline const Theme Light{
@@ -297,6 +352,11 @@ namespace term
             .muted = {.foreground = color::gray, .background = color::black,
                       .textStyle = TextStyle::Italic}};
 
+        std::unordered_map<std::string, Theme> Themes{
+            {"Light", Light},
+            {"Dark", Dark}
+        };
+
         inline Style success = Dark.success;
         inline Style error = Dark.error;
         inline Style warning = Dark.warning;
@@ -310,7 +370,11 @@ namespace term
             const Theme* selected = nullptr;
             if (name == "Light") selected = &Light;
             else if (name == "Dark") selected = &Dark;
-            else return false;
+            else if (name == current_theme) return true;
+            else{
+                if(!Themes.contains(std::string(name))) return false;
+                selected = &Themes[std::string(name)];
+            }
 
             success = selected->success;
             error = selected->error;
@@ -320,16 +384,38 @@ namespace term
             current_theme = std::string(name);
             return true;
         }
+        inline bool loadThemesFromJson(std::string_view path){
+            std::ifstream file{std::string(path)};
+            std::string file_contents;
+            while(file >> file_contents){}
+            json themes = json::parse(file_contents);
+            for(const auto& [key, value] : themes.items()){
+                Theme t;
+                try{
+                    t = Theme::BuildFromJson(value);
+                } catch (std::invalid_argument &e){
+                    std::cerr << "An error occured while parsing json data...\n";
+                    std::cerr << e.what() << "\n";
+                    continue;
+                }
+                if(Themes.contains(key)){
+                    // a theme with this name already exists
+                    // for now, we will log this to terminal and not overwrite the already existing one
+                    std::cerr << "A theme with the name \"" << key << "\" already exists..."; 
+                }
+                Themes[key] = t;
+            }
+            return true;
+        }
+
     }
 
-    inline void print(std::string_view message,
-                      style::Style output_style = style::Style())
+    inline void print(std::string_view message, style::Style output_style = style::Style())
     {
         std::cout << output_style.serialize() << message << "\x1b[0m";
     }
 
-    inline void println(std::string_view message,
-                        style::Style output_style = style::Style())
+    inline void println(std::string_view message, style::Style output_style = style::Style())
     {
         std::cout << output_style.serialize() << message << "\x1b[0m\n";
     }
