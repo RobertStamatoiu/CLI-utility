@@ -1,6 +1,7 @@
 **/archive/
 /.build/
 /dist/
+/bin/
 *.o
 *.obj
 *.pdb
