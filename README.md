@@ -52,27 +52,17 @@ in the file.
 
 ## Building
 
-From a Windows PowerShell prompt with MSYS2 UCRT64 installed:
+Newly added "build.ps1" script automatically builds all scripts and optionally adds the new binaries to your computer's PATH
 
-```powershell
-$cxx = "C:\msys64\ucrt64\bin\g++.exe"
-New-Item -ItemType Directory -Force .build | Out-Null
-& $cxx -std=c++20 -O2 -static -I include src\touch-script.cpp -o .build\touch.exe
-& $cxx -std=c++20 -O2 -static -I include src\mkproj-script.cpp -o .build\mkproj.exe
-& $cxx -std=c++20 -O2 -static -I include src\pysetup-script.cpp -o .build\pysetup.exe
-& $cxx -std=c++20 -O2 -static -I include src\del-script.cpp -o .build\del.exe
+All thats needed is to run, in any terminal, powershell or cmd, 
+
+```
+${repo-dir}/build.ps1
 ```
 
 All source files explicitly include `../include/term.hpp` and
-`../include/sys.hpp`. `pysetup-script.cpp` additionally includes
+`../include/sys.hpp`. `pysetup-script.cpp` and `../include/term.hpp` additionally include
 `../include/json.hpp`.
-
-## Distribution
-
-The current executables are stored in `dist/` and mirrored in the workspace
-`bin/` directory. Historical versioned executables are kept under `archive/`.
-The archive is intentionally excluded from Git by `.gitignore`; it remains
-available locally for version tracking and rollback.
 
 ## Layout
 
@@ -80,10 +70,10 @@ available locally for version tracking and rollback.
 CLI/
 ├── include/       Shared headers
 ├── src/           Utility implementations
-├── dist/          Current distributable executables
 ├── archive/       Local historical executables (not committed)
 ├── README.md      Project documentation
-└── .gitignore     Git exclusions
+├── .gitignore     Git exclusions
+└── build.ps1      Build and compile script
 ```
 ## Author
 
