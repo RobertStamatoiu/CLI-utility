@@ -1,3 +1,5 @@
+#pragma once
+
 #include "..\include\sys.hpp"
 #include "../include/term.hpp"
 
@@ -6,12 +8,11 @@
 
 namespace
 {
-    constexpr std::string_view VERSION = "0.4";
+    constexpr std::string_view TOUCH_VERSION = "0.4";
 }
 
-int main(int argc, const char* argv[])
+int TouchCLI(std::vector<std::string> args)
 {
-    const std::vector<std::string> args(argv + 1, argv + argc);
     if (args.empty() || args.size() > 3)
     {
         term::println(
@@ -33,7 +34,7 @@ int main(int argc, const char* argv[])
     {
         if (args.size() != 1)
             return sys::INVALID_INPUT_ERROR;
-        term::println("version: v" + std::string(VERSION), term::style::info);
+        term::println("version: v" + std::string(TOUCH_VERSION), term::style::info);
         return sys::SUCCESS;
     }
 

@@ -1,3 +1,6 @@
+#pragma once
+
+
 #include <algorithm>
 #include <array>
 // #include <cassert>
@@ -177,9 +180,8 @@ Modules:
 Description: followed by a list of modules, or just one, it installs those specific modules and their dependencies)";
 }
 
-int main(int argc, const char *argv[])
+int PysetupCLI(std::vector<std::string> varg)
 {
-    std::vector<std::string> varg(argv + 1, argv + argc);
     if (varg.empty())
     {
         term::println("Usage: pysetup <directory-name> <options>", term::style::error);

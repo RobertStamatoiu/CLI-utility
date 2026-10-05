@@ -1,3 +1,5 @@
+#pragma once
+
 #include "..\include\sys.hpp"
 #include "../include/term.hpp"
 
@@ -7,7 +9,7 @@
 
 namespace
 {
-    constexpr std::string_view VERSION = "1.3.3";
+    constexpr std::string_view MKPROJ_VERSION = "1.3.3";
 
     bool contains(const std::vector<std::string>& values, std::string_view value)
     {
@@ -15,9 +17,8 @@ namespace
     }
 }
 
-int main(int argc, const char* argv[])
+int MkprojCLI(const std::vector<std::string> args)
 {
-    const std::vector<std::string> args(argv + 1, argv + argc);
     if (args.empty())
     {
         term::println(
@@ -28,7 +29,7 @@ int main(int argc, const char* argv[])
     if (args[0] == "--version")
     {
         if (args.size() != 1) return sys::INVALID_INPUT_ERROR;
-        term::println("version: v" + std::string(VERSION), term::style::info);
+        term::println("version: v" + std::string(MKPROJ_VERSION), term::style::info);
         return sys::SUCCESS;
     }
     if (args[0] == "--help")
